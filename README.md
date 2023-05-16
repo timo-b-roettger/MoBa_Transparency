@@ -1,2 +1,2 @@
-# MoBa_Transparency
+# MoBa Transparency Project
 The associated repository for the MoBa Transparency project
