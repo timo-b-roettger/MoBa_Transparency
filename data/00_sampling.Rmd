@@ -55,4 +55,30 @@ Draw a small subset of articles for manual inspection.
 set.seed(99)
 sample(data$ApproximateTitle, 20, replace = FALSE)
 
+# Sample through years
+# Unique vector for each year
+years <- unique(data$Year)
+
+# Set the number of samples to be taken for each level
+num_samples <- 2
+
+# Set the number of samples to be taken for each level
+year_sample <- data.frame(ApproximateTitle = as.character(),
+                          Year = numeric(),
+                          TexttoParse = as.character())
+
+# Loop through the levels
+for (i in years) {
+  # Filter elements matching the current level
+  year_i <- data[data$Year == i,]
+  
+  # Sample a subset for the current level
+  year_subset <- year_i[sample(nrow(year_i), size = num_samples, replace = FALSE),]
+  
+  # Store in sample
+  year_sample <- rbind(year_sample, year_subset)
+  #title <- c(years,i)
+
+}
+
 ```
