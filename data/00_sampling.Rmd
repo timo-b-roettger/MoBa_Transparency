@@ -47,7 +47,7 @@ ggplot(data,
 
 ```
 
-## Sample for piloting
+## Sampling
 Draw a small subset of articles for manual inspection.
 
 ```{r sample}
@@ -60,7 +60,7 @@ sample(data$ApproximateTitle, 20, replace = FALSE)
 years <- unique(data$Year)
 
 # Set the number of samples to be taken for each level
-num_samples <- 2
+num_samples <- 30
 
 # Set the number of samples to be taken for each level
 year_sample <- data.frame(ApproximateTitle = as.character(),
@@ -78,7 +78,10 @@ for (i in years) {
   # Store in sample
   year_sample <- rbind(year_sample, year_subset)
   #title <- c(years,i)
-
 }
+
+# Q: How to deal with first 6 years having only scarce papers?
+# A solution, sample exhaustively from 2006-2010, take 30 from rest (n = 76 + 12*30 = 436)
+# A solution, sample exhaustively from 2006-2010, take 40 from rest (n = 76 + 12*40 = 556)
 
 ```
