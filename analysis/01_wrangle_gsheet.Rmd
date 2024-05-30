@@ -1,0 +1,488 @@
+---
+title: "01_WrangleGsheet"
+author: "Timo Roettger"
+date: "2024-02-26"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r loadData}
+
+# nifty code using the pacman package
+# it checks if the packages specified below are installed, if not, they will be installed, if yes, they will be loaded
+if (!require("pacman")) install.packages("pacman")
+pacman::p_load(rstudioapi, tidyverse)
+
+# set the current working directory to the one where this file is
+current_working_dir <- dirname(rstudioapi::getActiveDocumentContext()$path)
+setwd(current_working_dir)
+
+# let's load our dataset
+data_original <- read_csv("Reproducible research practices and transparency in secondary data analysis - MoBa.csv")
+coder_assignment <- read_csv("test_coding_assignment.csv")
+OA_original <- read_csv("2024-03-23_MoBaTransparency-OAAssessment.csv")
+
+```
+
+## Global shaping
+
+```{r global}
+
+# back up data
+data <- data_original
+OA <- OA_original
+
+# rename column names
+colnames(data) <- c(
+                    # §1
+                    "timestamp", "date", "coder", "article_id", "major_issue",
+                    # §2
+                    "year", "study_type", 
+                    # §3 
+                    "preregistered", "prereg_location", "prereg_access", "prereg_aspects",
+                    # §4
+                    "synthesised", "synth_location", "synth_access", "synth_docu",
+                    "other_data", "other_data_location", "other_data_access", "other_data_type",
+                    # §5
+                    "analysis", "analysis_location", "analysis_access", "robust_check",
+                    # §6
+                    "materials", "materials_location", "materials_access",
+                    # §7
+                    "replication",
+                    # §8
+                    "coi"
+                    )
+
+# add coder assignments
+coders <- coder_assignment %>% 
+  select(-TexttoParse, -Year) %>% 
+  rename(coder1 = Coder,
+         coder2 = Coder2,
+         article_id = ID) %>% 
+  mutate(article_id = as.character(article_id))
+
+
+# add coder assignments
+OA <- OA %>% 
+  select('...2', isOA)  %>% 
+    rename(article_id = '...2') %>% 
+    mutate(article_id = as.character(article_id))
+
+# merge with data
+data <- full_join(data, coders)
+data <- full_join(data, OA)
+
+####
+
+# remove triple coded by MK
+data$triple_coded <- ifelse(data$article_id %in% c(939, 171, 1000, 534, 809, 756) & data$coder == "MK",
+                            "yes", "no")
+data <- data %>% 
+  filter(triple_coded == "no") %>% 
+  select(-triple_coded)
+
+# Look for missing articles 
+print(
+  data %>% filter(is.na(timestamp)) %>% 
+    select(coder1, coder2, article_id) %>% 
+    arrange(article_id),
+  n = 50)
+
+#  1 Tamara NA     1001      
+#  2 Tamara NA     182       
+#  3 Julien NA     34        
+#  4 Timo   NA     382       
+#  5 Julien NA     431       
+#  6 Julien NA     441       
+#  7 Ivana  NA     77        
+#  8 Timo   NA     795       
+#  9 Tamara Max    882       
+# 10 Max    NA     901       
+# 11 Timo   NA     918
+
+# Got to share and let everybody do the remaining ones or I do it
+
+# look at duplicates by the same person 
+dup_IDs <- data %>% 
+  filter(duplicated(data %>% select(article_id, coder))) %>% 
+  pull(article_id, coder)
+
+duplicates <- data %>% 
+  filter(article_id %in% dup_IDs)
+
+# Got to print and and ask for correction
+write_csv(duplicates, "duplicates.csv")
+
+
+# remove real duplicates 
+# data <- data %>% 
+# filter(!duplicated(data %>% select(article_id, coder)))
+
+
+```
+
+```{r Round 2 Coding}
+
+# requires to exclude duplicates
+data_second <- data %>% 
+      filter(!is.na(coder2)) %>% 
+      select(-c(timestamp, date, year, ApproximateTitle, coder1, coder2)) %>% 
+      group_by(article_id) %>% 
+      #mutate(coder_num = paste0("coder_", row_number())) %>% 
+      ungroup() %>% 
+      pivot_longer(cols = -c(article_id, #coder_num, 
+                             coder)) %>% 
+      pivot_wider(id_cols = c(article_id, name),
+                  names_from = coder, 
+                  values_from = c(value)) %>% 
+      mutate(consensus = "add consensus") %>% 
+      select(-"NA")
+  
+
+
+
+```
+
+
+```{r normalizing strings}
+
+# major_issue
+## check uniques
+unique(data$major_issue)
+
+## merge relevant
+data_test <- data %>% 
+  mutate(major_issue = ifelse(major_issue == "Not a full article (e.g. just an abstract)" |  
+                              major_issue == "Not a full article (e.g. just an abstract, erratum)", "not a full article",
+                              ifelse(major_issue == "I don't have access to the full text", "no access",
+                                      ifelse(major_issue == "Article is not in English", "not in English",
+                                             ifelse(major_issue == "preprint in MedrXiv" | 
+                                                    major_issue == "NA" |
+                                                    major_issue == "PhD thesis" |
+                                                    major_issue == "There are no issues", "no issues",
+                                                    "other")))))
+
+## success?
+unique(data_test$major_issue)
+
+# distribution?
+xtabs(~major_issue, data_test)
+
+#----
+
+# year
+unique(data_test$year)
+# unpublished, 97, 806
+
+## "unpublished" should be changed to preprint publication year
+data_test[which(data_test$year == "unpublished"),]$article_id
+data_test[which(data_test$year == "unpublished"),]$year  <-  "2022"
+
+# correct typos
+id_dummy <- data_test[which(data_test$year == 97),]$article_id
+coder_assignment[which(coder_assignment$ID == id_dummy),]$Year # 2022
+data_test[which(data_test$article_id == id_dummy & data_test$year == 97),]$year <- "2022"
+
+id_dummy <- data_test[which(data_test$year == 806),]$article_id
+coder_assignment[which(coder_assignment$ID == id_dummy),]$Year # 2013
+data_test[which(data_test$article_id == id_dummy),]$year <- "2013"
+
+# check again
+unique(data_test$year)
+
+## make number
+data_test$year <- as.numeric(data_test$year)
+
+## plot to double check
+hist(data_test$year)
+
+## looks good now
+
+#----
+
+# study_type
+unique(data_test$study_type)
+
+## merge relevant
+data_test <- data_test %>% 
+  mutate(study_type = ifelse(study_type == "No empirical data (e.g., editorials, commentaries [without reanalysis], simulations, news, reviews, theoretical).    (SKIP TO SECTION 8)",
+                             "no empirical data",
+                             ifelse(study_type ==  "Proposes a method, uses MoBa to illustrate" | 
+                                    study_type ==  "validation study" | 
+                                    study_type ==  "Randomly selected MoBa data used as a control; main data taken from the Norwegian Transplantation Registry" |
+                                    study_type ==  "psychometric assessment of scales" | 
+                                    study_type ==  "introduction of new biobank"  | 
+                                    study_type ==  "psychometric evaluation of scale",
+                                    "Unclear", study_type)))
+
+#!#  discuss in group
+
+## check?
+unique(data_test$study_type)
+
+## distribution?
+xtabs(~study_type, data_test)
+
+#----
+
+# preregistered
+unique(data_test$preregistered)
+
+## rename
+data_test <- data_test %>% 
+  mutate(preregistered = case_when(preregistered %in% "No, there is no preregistration. (GO TO SECTION 4)" ~ "No", 
+                                   preregistered %in% "Yes, there is a preregistration" ~ "Yes", 
+                                   TRUE ~  preregistered))
+
+## distribution?
+xtabs(~preregistered, data_test)
+
+#----
+
+# prereg_location
+unique(data_test$prereg_location)
+
+data_test <- data_test %>% 
+  mutate(prereg_location = case_when(prereg_location %in% "A detailed study protocol is available at www.fhi.no/moba-en." ~ NA, 
+                                    TRUE ~  prereg_location))
+
+#----
+
+# prereg_access
+unique(data_test$prereg_access)
+
+#!# discuss in group: link was wrong --> no
+
+data_test <- data_test %>% 
+  mutate(prereg_access = case_when(prereg_access %in% c("I couldn't access it",
+                                                        "Original link was wrong, but i found it in OSF with https://osf.io/aqrxp") ~ "No", 
+                                  TRUE ~  prereg_access))
+
+## distribution?
+xtabs(~prereg_access, data_test)
+
+#----
+
+# prereg_aspects
+unique(data_test$prereg_aspects)
+
+#!#  could be split but since only two, leave it as is
+
+#----
+
+# synthesised
+unique(data_test$synthesised)
+
+data_test <- data_test %>% 
+  mutate(synthesised = case_when(synthesised %in% "No, synthesised data are not available. (GO TO SECTION 4.5)" ~ "No", 
+                                 synthesised %in% "Not relevant, data are only used as an example introducing a new method" ~ NA,
+                                 synthesised %in% "Simulated data and codes (not sure how synthesized and simulated data are related)" ~ NA,
+                                 TRUE ~  synthesised))
+
+#----
+
+# other data
+unique(data_test$other_data)
+
+data_test <- data_test %>% 
+  mutate(other_data = case_when(other_data %in% "No (GO TO SECTION 5)" ~ "no", 
+                                other_data %in% "Authors provide direct contact information to the person that can provide underlying data for the study \"The underlying data may be requested and will be made available from the Norwegian Mother and Child Cohort study steering committee by contacting Gun Peggy Knudsen at the Norwegian Institute of Public Health (E-mail: Gun.Peggy.Knudsen@fhi.no).\"" ~ "yes",
+                                other_data %in% "\"Data are however available from the authors upon reasonable request and with permission of the data owner if requestors wish to access the data for the purposes of checking analyses.\"" ~ "yes",
+                                TRUE ~  other_data))
+
+## distribution?
+xtabs(~other_data, data_test)
+
+#----
+
+# other data location
+unique(data_test$other_data_location)
+
+## distribution?
+xtabs(~other_data_location, data_test)
+
+#----
+
+# other data access
+unique(data_test$other_data_access)
+
+## distribution?
+xtabs(~other_data_access, data_test)
+
+
+#----
+
+# other data type
+unique(data_test$other_data_type)
+
+data_test <- data_test %>% 
+  mutate(other_data_type = case_when(other_data_type %in% "PDFs of sample characteristics & questionnaire variable frequencies" ~ "metadata", 
+                                     other_data_type %in% "rdata files including summary data from the GWAS are available" ~ "summary statistics",
+                                     other_data_type %in% "Summary stats" ~ "summary statistics",
+                                     other_data_type %in% "Supplementary summary statistics" ~ "summary statistics",
+                                     other_data_type %in% "Unclear, but should be all data(?)" ~ "unclear",
+                                     other_data_type %in% "other relevant datasets used for the study" ~ "other data",
+                                     other_data_type %in% "different types of publicly available data for triangulation" ~ "other data",
+                                     other_data_type %in% "additional raw data" ~ "other data",
+                                     other_data_type %in% "Variable catalogue" ~ "metadata",
+                                     other_data_type %in% "Metadata of MoBa data" ~ "metadata",
+                                     other_data_type %in% "\"Data are however available from the authors upon reasonable request and with permission of MoBa.\"" ~ NA,
+                                     other_data_type %in% "Metadata" ~ "metadata",
+                                     other_data_type %in% "Metadata for the variables in supplementary materials and additionally some more materials in dbGaP database (that I could not find/access)" ~ "metadata",
+                                     other_data_type %in% "Data underlying analyses" ~ "other data",
+                                     other_data_type %in% "Metadata (variable definitions)" ~ "metadata",
+                                     TRUE ~  other_data_type))
+
+unique(data_test$other_data_type)
+
+## distribution?
+xtabs(~other_data_type, data_test)
+
+#----
+
+# analysis
+unique(data_test$analysis)
+
+data_test <- data_test %>% 
+  mutate(analysis = case_when(analysis %in% "No, analysis scripts are not available. (GO TO SECTION 6)" ~ "no", 
+                                     analysis %in% "Yes, analysis scripts are freely available" ~ "freely available",
+                                     analysis %in% "No, analysis scripts are not available. (GO TO SECTION 5.4)" ~ "no",
+                                     analysis %in% "Authors point to a third party" ~ "authors point to third party",
+                                     analysis %in% "There is a OSF-link leading to no code or other info about this project" ~ "no",
+                                     analysis %in% "R scripts upon request" ~ "upon request",
+                                     analysis %in% "it says \"we provide a description of the procedure used to clean the genomic data and calculate the PGIs, the code used to link all the data sources together and analyze the data.\" but I don't find the code." ~ "no",
+                                     analysis %in% "from authors" ~ "upon request",
+                                     analysis %in% "upon request" ~ "upon request",
+                                     analysis %in% "authors point towards supplementary material - not there" ~ "no",
+                              TRUE ~  analysis))
+
+unique(data_test$analysis)
+
+## distribution?
+xtabs(~analysis, data_test)
+
+#----
+
+# analysis location
+unique(data_test$analysis_location)
+
+## distribution?
+xtabs(~analysis_location, data_test)
+
+#----
+
+# analysis access
+unique(data_test$analysis_access)
+
+## distribution?
+xtabs(~analysis_access, data_test)
+
+
+#----
+
+# robustness check
+unique(data_test$robust_check)
+
+data_test <- data_test %>% 
+  mutate(robust_check = case_when(robust_check %in% "No" ~ "no", 
+                                  robust_check %in% "Yes, sensitivity analysis" ~ "sensitivity",
+                                  robust_check %in% "Yes, sensitivity analysis;Yes, power analysis" ~ "sensitivity & power",
+                                  robust_check %in% "Yes, power analysis" ~ "power",
+                              TRUE ~  robust_check))
+
+## distribution?
+xtabs(~robust_check, data_test)
+
+#----
+
+# materials
+unique(data_test$materials)
+
+data_test <- data_test %>% 
+  mutate(materials = case_when(materials %in% "No, other materials are not available. (GO TO SECTION 7)" ~ "no", 
+                                     materials %in% "Yes, materials are freely available" ~ "freely available",
+                                     materials %in% "Other materials or additional information are available through a third party" ~ "authors point to third party",
+                                     materials %in% "R code for the plausible range of bias' simulations" ~ "authors point to third party",
+                              TRUE ~  materials))
+
+unique(data_test$materials)
+
+## distribution?
+xtabs(~materials, data_test)
+
+#----
+
+# materials location
+unique(data_test$materials_location)
+
+## distribution?
+xtabs(~materials_location, data_test)
+
+#----
+
+# materials access
+unique(data_test$materials_access)
+
+## distribution?
+xtabs(~materials_access, data_test)
+
+#----
+
+# replication
+unique(data_test$replication)
+
+data_test <- data_test %>% 
+  mutate(replication = case_when(replication %in% "There is no clear statement that the article reports a replication study (or studies)" ~ "no", 
+                                     replication %in% "The article claims to report a replication study (or studies)" ~ "yes",
+                                     replication %in% "\"These findings replicate and expand findings from previous cross-sectional studies...\"- but I don't think they mean that they've replicated any study" ~ "no",
+                                     replication %in% "It's complicated. It uses dataset for discovery then replicates (incl MoBa)" ~ "unclear",
+                              TRUE ~  replication))
+
+unique(data_test$replication)
+
+## distribution?
+xtabs(~replication, data_test)
+
+
+# coi
+unique(data_test$coi)
+
+data_test <- data_test %>% 
+  mutate(coi = case_when(coi %in% "Yes, the statement says that there is no conflict of interest." ~ "statement says no", 
+                                     coi %in% "No, there is no conflict of interest statement." ~ "no statement",
+                                     coi %in% "Yes, the statement says that there are one or more conflicts of interest." ~ "statement says yes",
+                                     coi %in% "not sure - could only access the author version" ~ "no statement",
+                                     coi %in% "\"The authors are independent of any of the funding agencies.\"" ~ "statement says no",
+                              TRUE ~  coi))
+
+unique(data_test$coi)
+
+## distribution?
+xtabs(~coi, data_test)
+
+
+```
+
+```{r global}
+
+
+```
+
+```{r global}
+
+
+```
+
+```{r global}
+
+
+```
+
+```{r global}
+
+
+```
+
