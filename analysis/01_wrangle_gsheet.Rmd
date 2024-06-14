@@ -91,63 +91,74 @@ print(
     arrange(article_id),
   n = 50)
 
-#  1 Tamara NA     1001      
-#  2 Tamara NA     182       
-#  3 Julien NA     34        
-#  4 Timo   NA     382       
-#  5 Julien NA     431       
-#  6 Julien NA     441       
-#  7 Ivana  NA     77        
-#  8 Timo   NA     795       
-#  9 Tamara Max    882       
-# 10 Max    NA     901       
-# 11 Timo   NA     918
+# none missing anymore
 
-# Got to share and let everybody do the remaining ones or I do it
+# remove some mislabeled article_id entries
+data <- data %>% 
+  # typo but also a duplicate
+  filter(article_id != "l759") %>%
+  # duplicate and removed due to being an abstract only anyways
+  filter(article_id != "382 (article has been retracted)") %>%
+  # duplicate and fixed
+  filter(article_id != "42 - only preprint") %>%
+  # duplicate and fixed
+  filter(article_id != "77 - duplicate of ID 11") %>% 
+  filter(article_id != "77")
+  # erroneous and can't be traced
+  filter(article_id != "2021")
+  
+data$article_id <- as.numeric(data$article_id)
 
 # look at duplicates by the same person 
-dup_IDs <- data %>% 
-  filter(duplicated(data %>% select(article_id, coder))) %>% 
-  pull(article_id, coder)
+# dup_IDs <- data %>% 
+#   filter(duplicated(data %>% select(article_id, coder))) %>% 
+#   pull(article_id, coder)
+# 
+# duplicates <- data %>% 
+#   filter(article_id %in% dup_IDs)
+# 
+# # Got to print and and ask for correction
+# write_csv(duplicates, "duplicates.csv")
 
-duplicates <- data %>% 
-  filter(article_id %in% dup_IDs)
+## after manual correction
+duplicates_checked <- read_csv("duplicates_checked.csv")
 
-# Got to print and and ask for correction
-write_csv(duplicates, "duplicates.csv")
-
+# merge to remove duplicates
+xdata <- full_join(data, duplicates_checked)
 
 # remove real duplicates 
-# data <- data %>% 
-# filter(!duplicated(data %>% select(article_id, coder)))
+xdata <- xdata %>% 
+  filter(is.na(remove))
 
+# check dupe again
+dup_IDs <- xdata %>%
+  filter(duplicated(xdata %>% select(article_id, coder))) %>%
+  pull(article_id, coder)
 
-```
-
-```{r Round 2 Coding}
-
-# requires to exclude duplicates
-data_second <- data %>% 
-      filter(!is.na(coder2)) %>% 
-      select(-c(timestamp, date, year, ApproximateTitle, coder1, coder2)) %>% 
-      group_by(article_id) %>% 
-      #mutate(coder_num = paste0("coder_", row_number())) %>% 
-      ungroup() %>% 
-      pivot_longer(cols = -c(article_id, #coder_num, 
-                             coder)) %>% 
-      pivot_wider(id_cols = c(article_id, name),
-                  names_from = coder, 
-                  values_from = c(value)) %>% 
-      mutate(consensus = "add consensus") %>% 
-      select(-"NA")
+# remove the last 3 manually
+xdata <- xdata %>% 
+  filter(timestamp != "2024/02/24 2:12:30 pm EET") %>%
+  filter(timestamp != "2024/04/03 6:40:12 am EET") %>%
+  filter(timestamp != "2024/03/01 10:02:25 am EET")
   
+# check dupe again
+dup_IDs <- xdata %>%
+  filter(duplicated(xdata %>% select(article_id, coder))) %>%
+  pull(article_id, coder)  
 
+# done!
 
+# how many unique items
+n_distinct(xdata$article_id)
+
+# 944 close enough
 
 ```
 
 
 ```{r normalizing strings}
+
+data <- xdata
 
 # major_issue
 ## check uniques
@@ -168,18 +179,11 @@ data_test <- data %>%
 ## success?
 unique(data_test$major_issue)
 
-# distribution?
-xtabs(~major_issue, data_test)
-
 #----
 
 # year
 unique(data_test$year)
-# unpublished, 97, 806
-
-## "unpublished" should be changed to preprint publication year
-data_test[which(data_test$year == "unpublished"),]$article_id
-data_test[which(data_test$year == "unpublished"),]$year  <-  "2022"
+# 97, 806
 
 # correct typos
 id_dummy <- data_test[which(data_test$year == 97),]$article_id
@@ -215,7 +219,8 @@ data_test <- data_test %>%
                                     study_type ==  "Randomly selected MoBa data used as a control; main data taken from the Norwegian Transplantation Registry" |
                                     study_type ==  "psychometric assessment of scales" | 
                                     study_type ==  "introduction of new biobank"  | 
-                                    study_type ==  "psychometric evaluation of scale",
+                                    study_type ==  "psychometric evaluation of scale"  | 
+                                    study_type ==  "working paper",
                                     "Unclear", study_type)))
 
 #!#  discuss in group
@@ -280,8 +285,8 @@ data_test <- data_test %>%
   mutate(synthesised = case_when(synthesised %in% "No, synthesised data are not available. (GO TO SECTION 4.5)" ~ "No", 
                                  synthesised %in% "Not relevant, data are only used as an example introducing a new method" ~ NA,
                                  synthesised %in% "Simulated data and codes (not sure how synthesized and simulated data are related)" ~ NA,
+                                 synthesised %in% "Simulations are available" ~ NA,
                                  TRUE ~  synthesised))
-
 #----
 
 # other data
@@ -291,6 +296,7 @@ data_test <- data_test %>%
   mutate(other_data = case_when(other_data %in% "No (GO TO SECTION 5)" ~ "no", 
                                 other_data %in% "Authors provide direct contact information to the person that can provide underlying data for the study \"The underlying data may be requested and will be made available from the Norwegian Mother and Child Cohort study steering committee by contacting Gun Peggy Knudsen at the Norwegian Institute of Public Health (E-mail: Gun.Peggy.Knudsen@fhi.no).\"" ~ "yes",
                                 other_data %in% "\"Data are however available from the authors upon reasonable request and with permission of the data owner if requestors wish to access the data for the purposes of checking analyses.\"" ~ "yes",
+                                other_data %in% "Yes" ~ "yes",
                                 TRUE ~  other_data))
 
 ## distribution?
@@ -357,6 +363,7 @@ data_test <- data_test %>%
                                      analysis %in% "from authors" ~ "upon request",
                                      analysis %in% "upon request" ~ "upon request",
                                      analysis %in% "authors point towards supplementary material - not there" ~ "no",
+                                     analysis %in% "Manuscript points to supplement, but I cannot find it." ~ "no",
                               TRUE ~  analysis))
 
 unique(data_test$analysis)
@@ -406,6 +413,7 @@ data_test <- data_test %>%
                                      materials %in% "Yes, materials are freely available" ~ "freely available",
                                      materials %in% "Other materials or additional information are available through a third party" ~ "authors point to third party",
                                      materials %in% "R code for the plausible range of bias' simulations" ~ "authors point to third party",
+                                     materials %in% "There should be data on the procedure, but I cannot find the supplement which contains these information." ~ "no",
                               TRUE ~  materials))
 
 unique(data_test$materials)
@@ -463,6 +471,106 @@ unique(data_test$coi)
 ## distribution?
 xtabs(~coi, data_test)
 
+
+```
+
+```{r Round 2 Coding}
+
+# requires to exclude duplicates
+data_second <- data_test %>% 
+      filter(!is.na(coder2)) %>% 
+      select(-c(timestamp, date, year, coder1, coder2, ApproximateTitle, remove, isOA)) %>% 
+      group_by(article_id) %>% 
+      ungroup() %>% 
+      pivot_longer(cols = -c(article_id,
+                             coder)) %>% 
+      pivot_wider(id_cols = c(article_id, name),
+                  names_from = coder, 
+                  values_from = c(value))  
+
+data_second$consensus = "add consensus exactly as states in one of your two columns. Please do not add new categories."
+
+# code mismatches
+data_second <- data_second %>% 
+  filter(!if_all(c(MK, TK, IM, TR, JM, AB), is.na)) %>% 
+  mutate(
+    rater_pair = case_when(
+      !is.na(MK) & !is.na(TK) ~ "MK & TK",
+      is.na(MK) & !is.na(TK) ~ "MK & TK",
+      !is.na(MK) & is.na(TK) ~ "MK & TK",
+      !is.na(IM) & !is.na(TR) ~ "IM & TR",
+      is.na(IM) & !is.na(TR) ~ "IM & TR",
+      !is.na(IM) & is.na(TR) ~ "IM & TR",
+      !is.na(JM) & !is.na(AB) ~ "JM & AB",
+      is.na(JM) & !is.na(AB) ~ "JM & AB",
+      !is.na(JM) & is.na(AB) ~ "JM & AB",
+      TRUE ~ "error"
+    ),
+    mismatch = case_when(
+      MK == TK ~ "match", 
+      IM == TR ~ "match",
+      JM == AB ~ "match",
+      TRUE ~ "mismatch"
+    ),
+    mismatch_type = case_when(
+      mismatch == "match" ~ "match",
+      mismatch == "mismatch" & name == "major_issue" ~ "major",
+      mismatch == "mismatch" & name == "study_type" ~ "study type", 
+      mismatch == "mismatch" & !is.na(MK) & is.na(TK) ~ "mismatch higher up", 
+      mismatch == "mismatch" & is.na(MK) & !is.na(TK) ~ "mismatch higher up", 
+      mismatch == "mismatch" & !is.na(IM) & is.na(TR) ~ "mismatch higher up", 
+      mismatch == "mismatch" & is.na(IM) & !is.na(TR) ~ "mismatch higher up", 
+      mismatch == "mismatch" & !is.na(JM) & is.na(AB) ~ "mismatch higher up", 
+      mismatch == "mismatch" & is.na(JM) & !is.na(AB) ~ "mismatch higher up", 
+     TRUE ~ "other"
+    ))
+ 
+
+# How many mismatches overall?
+xtabs(~mismatch, data_second)[1] / nrow(data_second)
+# 29.8% but there are many mismatches that are consequences of higher order mismatches
+
+# check distribution
+xtabs(~mismatch_type, data_second)
+
+# so only 33 + 77 + 57 are actual mismatches
+(33 + 77 + 57) / nrow(data_second)
+# 9%
+
+# okay that is fine
+
+# how many per rater pair
+data_second %>% 
+  filter(rater_pair == "IM & TR") %>% 
+  count(rater_pair, mismatch_type) %>%          
+  mutate(prop = 100*prop.table(n))
+
+# under under 10% actual mismatches
+
+data_second %>% 
+  filter(rater_pair == "JM & AB") %>% 
+  count(rater_pair, mismatch_type) %>%          
+  mutate(prop = 100*prop.table(n))
+
+# under under 10% actual mismatches
+
+data_second %>% 
+  filter(rater_pair == "MK & TK") %>% 
+  count(rater_pair, mismatch_type) %>%          
+  mutate(prop = 100*prop.table(n))
+
+# ~ 12% actual mismatches (not even counting all the items were both NOT coded therefore being a match)
+# so all in all no need for further coding
+
+# add in approximate title again
+reference <- data_test %>% 
+  filter(!is.na(coder2)) %>% 
+  select(article_id, ApproximateTitle)
+
+data_second2 <- left_join(data_second, reference, by = "article_id") %>% 
+  distinct()
+
+write_csv(data_second2, "data_consensus.csv")
 
 ```
 
