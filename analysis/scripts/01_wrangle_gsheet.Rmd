@@ -21,9 +21,9 @@ current_working_dir <- dirname(rstudioapi::getActiveDocumentContext()$path)
 setwd(current_working_dir)
 
 # let's load our dataset
-data_original <- read_csv("Reproducible research practices and transparency in secondary data analysis - MoBa.csv")
-coder_assignment <- read_csv("test_coding_assignment.csv")
-OA_original <- read_csv("2024-03-23_MoBaTransparency-OAAssessment.csv")
+data_original <- read_csv("../data/Reproducible research practices and transparency in secondary data analysis - MoBa.csv")
+coder_assignment <- read_csv("../data/test_coding_assignment.csv")
+OA_original <- read_csv("../data/2024-03-23_MoBaTransparency-OAAssessment.csv")
 
 ```
 
@@ -103,7 +103,7 @@ data <- data %>%
   filter(article_id != "42 - only preprint") %>%
   # duplicate and fixed
   filter(article_id != "77 - duplicate of ID 11") %>% 
-  filter(article_id != "77")
+  filter(article_id != "77") %>% 
   # erroneous and can't be traced
   filter(article_id != "2021")
   
@@ -118,10 +118,10 @@ data$article_id <- as.numeric(data$article_id)
 #   filter(article_id %in% dup_IDs)
 # 
 # # Got to print and and ask for correction
-# write_csv(duplicates, "duplicates.csv")
+# write_csv(duplicates, "../data/duplicates.csv")
 
 ## after manual correction
-duplicates_checked <- read_csv("duplicates_checked.csv")
+duplicates_checked <- read_csv("../data/duplicates_checked.csv")
 
 # merge to remove duplicates
 xdata <- full_join(data, duplicates_checked)
@@ -151,7 +151,7 @@ dup_IDs <- xdata %>%
 # how many unique items
 n_distinct(xdata$article_id)
 
-# 944 close enough
+# 943!
 
 ```
 
@@ -183,7 +183,7 @@ unique(data_test$major_issue)
 
 # year
 unique(data_test$year)
-# 97, 806
+# fix 97, 806
 
 # correct typos
 id_dummy <- data_test[which(data_test$year == 97),]$article_id
@@ -223,7 +223,6 @@ data_test <- data_test %>%
                                     study_type ==  "working paper",
                                     "Unclear", study_type)))
 
-#!#  discuss in group
 
 ## check?
 unique(data_test$study_type)
@@ -258,8 +257,6 @@ data_test <- data_test %>%
 
 # prereg_access
 unique(data_test$prereg_access)
-
-#!# discuss in group: link was wrong --> no
 
 data_test <- data_test %>% 
   mutate(prereg_access = case_when(prereg_access %in% c("I couldn't access it",
@@ -527,7 +524,7 @@ data_second <- data_second %>%
  
 
 # How many mismatches overall?
-xtabs(~mismatch, data_second)[1] / nrow(data_second)
+1-xtabs(~mismatch, data_second)[1] / nrow(data_second)
 # 29.8% but there are many mismatches that are consequences of higher order mismatches
 
 # check distribution
@@ -545,14 +542,14 @@ data_second %>%
   count(rater_pair, mismatch_type) %>%          
   mutate(prop = 100*prop.table(n))
 
-# under under 10% actual mismatches
+# under 10% actual mismatches
 
 data_second %>% 
   filter(rater_pair == "JM & AB") %>% 
   count(rater_pair, mismatch_type) %>%          
   mutate(prop = 100*prop.table(n))
 
-# under under 10% actual mismatches
+# under 10% actual mismatches
 
 data_second %>% 
   filter(rater_pair == "MK & TK") %>% 
@@ -560,7 +557,7 @@ data_second %>%
   mutate(prop = 100*prop.table(n))
 
 # ~ 12% actual mismatches (not even counting all the items were both NOT coded therefore being a match)
-# so all in all no need for further coding
+# so all in all no need for further cross-coding
 
 # add in approximate title again
 reference <- data_test %>% 
@@ -570,27 +567,57 @@ reference <- data_test %>%
 data_second2 <- left_join(data_second, reference, by = "article_id") %>% 
   distinct()
 
-write_csv(data_second2, "data_consensus.csv")
+# write_csv(data_second2, "../data/data_consensus.csv")
 
 ```
 
-```{r global}
+```{r import_consensus_again}
 
+# load in
+consensus <- read_csv("../data/MoBa_Consensus4Import.csv")
 
-```
+# into wide format again
+consensus <- consensus %>% 
+  select(article_id, name, consensus, ApproximateTitle) %>% 
+  pivot_wider(names_from = name, values_from = consensus) 
 
-```{r global}
+# prepare metadata we threw out earlier
+data_sup_infos <- data_test %>% 
+  filter(!is.na(coder2)) %>% 
+  select(article_id, year, coder1, coder2, isOA) %>% 
+  filter(!duplicated(article_id))
 
+# so we can merge them again with consensus
+consensus <- consensus %>% left_join(data_sup_infos)
 
-```
+# prepare cases that were not double-coded
+data_4merge <- data_test %>% 
+      filter(is.na(coder2)) %>% 
+      select(-c(timestamp, -date)) 
 
-```{r global}
+# double-check duplicates again
+data_4merge[duplicated(data_4merge$article_id),]
+# 24, 438, 806, 822, 705
 
+# check whats happened
+#View(data_4merge[data_4merge$article_id %in% c(24, 438, 806, 822, 705),])
 
-```
+# 24, 438, 705, 806 duplicated because the wrong coder (JM) also coded
+# 822 duplicated because the wrong coders (MK, TK) also coded
+data_4merge <- data_4merge %>% 
+  mutate(remove = case_when(
+    article_id %in% c(24, 438, 705, 806) & coder == "JM" ~ 1,
+    article_id == 822 & coder != "AB" ~ 1,
+    .default = 0
+  )) %>% 
+  filter(remove == 0)
 
-```{r global}
+# merge into final data set with all data
+final <- full_join(consensus, data_4merge) %>% 
+  select(-coder, -date, -remove)
 
+# write
+write_csv(final, "../data/derived_data_table.csv")
 
 ```
 

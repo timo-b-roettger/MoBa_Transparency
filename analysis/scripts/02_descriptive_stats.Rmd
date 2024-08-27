@@ -1,0 +1,677 @@
+---
+title: "02_descriptive_stats"
+author: "Timo Roettger"
+date: "2024-08-21"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, 
+                      warning = FALSE, 
+                      error = FALSE)
+```
+
+## General characteristics
+
+```{r loadData}
+
+# nifty code using the pacman package
+# it checks if the packages specified below are installed, if not, they will be installed, if yes, they will be loaded
+if (!require("pacman")) install.packages("pacman")
+pacman::p_load(rstudioapi, tidyverse, janitor, patchwork, ggstream)
+
+# set the current working directory to the one where this file is
+current_working_dir <- dirname(rstudioapi::getActiveDocumentContext()$path)
+# set when runnning script outside of knitting
+# setwd(current_working_dir)
+
+# let's load our dataset
+data <- read_csv("../data/derived_data_table.csv")
+
+```
+
+
+```{r major_issues}
+
+# major_issue
+## check unique
+unique(data$major_issue)
+
+# 3x NAs, on further inspection, these ought to be "other"
+data <- data %>% 
+  mutate(major_issue = ifelse(is.na(major_issue), "other", major_issue))
+
+# cross_tab
+major_issues <- data %>% 
+  # move "yes" response to "other"
+  mutate(major_issue = ifelse(major_issue == "yes", "other", major_issue)) %>% 
+  group_by(major_issue) %>%
+  summarise(n = n()) %>%
+  mutate(prop = (n / sum(n)) * 100)
+
+# subset
+data_no_issues <- data %>% 
+  filter(major_issue == "no issues")
+  
+```
+
+`r major_issues[major_issues$major_issue == "no issues",]$n` of articles were coded as in principle assessible (
+`r round(major_issues[major_issues$major_issue == "no issues",]$prop,1)`%)
+). Only those articles were further analysed. 
+`r major_issues[major_issues$major_issue == "no access",]$n` of articles could not be accessed by the coder (`r round(major_issues[major_issues$major_issue == "no access",]$prop,1)`%); 
+`r major_issues[major_issues$major_issue == "not a full article",]$n` of articles were coded as not being a full article, i.e. conference abstract or an erratum (
+`r round(major_issues[major_issues$major_issue == "not a full article",]$prop,1)`%); 
+`r major_issues[major_issues$major_issue == "not in English",]$n` of articles were coded as not being written in English (
+`r round(major_issues[major_issues$major_issue == "not in English",]$prop,1)`%); and
+`r major_issues[major_issues$major_issue == "other",]$n` of articles were coded as having other issues (
+`r round(major_issues[major_issues$major_issue == "other",]$prop,1)`%) were coded as other issues, including papers that did not use MoBa.
+
+```{r publication_year}
+
+# year
+unique(data_no_issues$year)
+
+# only two instances of 2024, since we plot proportions it is useful to collapse 2023 and 2024 into each other
+
+data_no_issues <- data_no_issues %>% 
+  mutate(year = ifelse(year == 2024, 2023, year))
+
+## plot 
+year_plot <- 
+ggplot(data_no_issues) +
+  geom_histogram(aes(x = year),
+                 binwidth = 1,
+                 fill = "lightgrey",
+                 color = "#9AA6E5") +
+  labs(y = " ",
+       x = "\npublication year") + 
+  scale_x_continuous(breaks =  c(2007, 2015, 2023),
+                     labels = c("2007", "2015", "2023-2024")) +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+```
+
+
+```{r study_type}
+
+# study_type
+unique(data_no_issues$study_type)
+
+# cross_tab
+study_type <- 
+data_no_issues %>% group_by(study_type) %>%
+  summarise(n = n()) %>%
+  mutate(prop = (n / sum(n)) * 100)
+
+# subset Meta_analysis and secondary analysis. 
+data_empirical <- data_no_issues %>% 
+  filter(study_type %in% c("Data synthesis - Meta-analysis.", "Secondary analysis of MoBa data", "Unclear")) %>% 
+  # The "unclear" category was mostly not coded by coders, so keep only those that were considered codable
+  filter(!is.na(preregistered))
+
+# 737 remaining
+
+```
+
+Of those articles that were in principle assessible, `r study_type[study_type$study_type == "Secondary analysis of MoBa data",]$n` of articles were coded as secondary analysis of MoBa data (`r round(study_type[study_type$study_type == "Secondary analysis of MoBa data",]$prop,1)`%) and `r study_type[study_type$study_type == "Data synthesis - Meta-analysis.",]$n` of articles were coded as being part of a meta analysis (including other epidiomological data sets, `r round(study_type[study_type$study_type == "Data synthesis - Meta-analysis.",]$prop,1)`%). 
+Only those two categories were further evaluated. 
+`r study_type[study_type$study_type == "no empirical data",]$n` of articles were coded as not presenting data (i.e. editorials or reviews, `r round(study_type[study_type$study_type == "no empirical data",]$prop,1)`%) and 
+`r study_type[study_type$study_type == "Unclear",]$n` of articles could not be categorized ("unclear) but were considered not further assessible (i.e. editorials or reviews, `r round(study_type[study_type$study_type == "Unclear",]$prop,1)`%). 
+This left us with `r study_type[study_type$study_type == "Secondary analysis of MoBa data",]$n + study_type[study_type$study_type == "Data synthesis - Meta-analysis.",]$n` articles that were further analysed.
+
+
+```{r pregistration}
+
+# preregistered
+unique(data_empirical$preregistered)
+
+# cross_tab
+prereg <- data_empirical %>% group_by(preregistered) %>%
+  summarise(n = n()) %>%
+  mutate(prop = (n / sum(n)) * 100)
+
+# hack to keep all response even if 
+dummy_prereg <- data.frame(expand.grid(year = seq(2007,2023), preregistered = c("Yes", "No")))
+
+# only 3 remaining
+prereg_year_agg <- data_empirical %>% 
+  group_by(year, preregistered) %>% 
+  summarise(n = n()) %>%
+  mutate(prop = (n / sum(n))) %>% 
+  select(-n) %>% 
+  full_join(dummy_prereg) %>% 
+  mutate(prop = ifelse(is.na(prop), 0, prop))
+
+prereg_plot <- 
+  ggplot(prereg_year_agg, 
+         aes(x = year, y = prop, fill = preregistered)) +
+  geom_area() + 
+  scale_fill_manual(values = c("lightgrey","#499C76"),
+                    name = NULL, labels = c("not preregistered", "preregistered")) +
+  labs(title = "(A) Preregistrations",
+       x = "\nyear of publication",
+       y = "proportion\n") +
+  scale_y_continuous(breaks = c(0,.20,.40,.60,.80,1),
+                      labels = c("0%", "20%", "40%", "60%", "80%",  "100%")) +
+  scale_x_continuous(breaks =  c(2007, 2015, 2023),
+                     labels = c("2007", "2015", "2023-2024")) +
+  theme_minimal() 
+
+#----
+
+# prereg_location
+unique(data_empirical[data_empirical$preregistered == "Yes",]$prereg_location)
+
+prereg_location <- data_empirical %>% 
+  filter(preregistered == "Yes") %>% 
+  group_by(prereg_location) %>%
+  summarise(n = n()) %>%
+  mutate(prop = (n / sum(n)) * 100)
+
+#----
+
+# prereg_access
+unique(data_empirical[data_empirical$preregistered == "Yes",]$prereg_access)
+
+prereg_access <- data_empirical %>% 
+  filter(preregistered == "Yes") %>% 
+  group_by(prereg_access) %>%
+  summarise(n = n()) %>%
+  mutate(prop = (n / sum(n)) * 100)
+
+# after some digging, I could access the preregistration of the as "No" coded as well.
+
+#----
+
+# prereg_aspects
+unique(data_empirical[data_empirical$preregistered == "Yes",]$prereg_aspects)
+
+#----
+
+```
+
+In the entire corpus, there were `r prereg[prereg$preregistered == "Yes",]$n` studies that reported to have preregistered aspects of their analysis. 
+With the available information we were able to recover the original preregistration (albeit it required some digging). Upon further scrutiny, all three preregistrations preregistered some aspects of the analysis including research question, variables and data analysis, but LOOK DEEPER INTO THOSE THREE
+
+```{r synthesised_data}
+
+unique(data_empirical$synthesised)
+
+# Nope nada
+
+```
+
+None of the studies reported to use synthesized data, which in principle would allow to reproduce their analysis without violating data protection laws. 
+
+```{r other_data}
+
+# other data
+unique(data_empirical$other_data)
+
+# 2x NAs, one further inspection, these ought to be "no"
+data_empirical <- data_empirical %>% 
+  mutate(other_data = ifelse(is.na(other_data), "no", other_data))
+
+## distribution?
+other_data <- 
+data_empirical %>% group_by(other_data) %>%
+  summarise(n = n()) %>%
+  mutate(prop = (n / sum(n)) * 100)
+
+# hack to keep all response even if 0
+dummy_other <- data.frame(expand.grid(year = seq(2007,2023), other_data = c("yes", "no")))
+
+# prepare for plot
+other_year_agg <- data_empirical %>% 
+  group_by(year, other_data) %>% 
+  summarise(n = n()) %>%
+  mutate(prop = (n / sum(n))) %>% 
+  select(-n) %>% 
+  full_join(dummy_other) %>% 
+  mutate(prop = ifelse(is.na(prop), 0, prop))
+
+other_data_plot <- 
+  ggplot(other_year_agg, 
+         aes(x = year, y = prop, fill = other_data)) +
+    geom_area() + 
+  scale_fill_manual(values = c("lightgrey","#499C76"),
+                    name = NULL, labels = c("no additional data", "additional data")) +
+  labs(title = "(B) Additional data sharing",
+       x = "\nyear of publication",
+       y = "proportion\n") +
+  scale_y_continuous(breaks = c(0,.20,.40,.60,.80,1),
+                      labels = c("0%", "20%", "40%", "60%", "80%",  "100%")) +
+  scale_x_continuous(breaks =  c(2007, 2015, 2023),
+                     labels = c("2007", "2015", "2023-2024")) +
+  theme_minimal()
+
+#----
+
+# other data location
+unique(data_empirical[data_empirical$other_data == "yes",]$other_data_location)
+
+## distribution?
+other_data_location <- data_empirical %>% 
+  filter(other_data == "yes") %>% 
+  group_by(other_data_location) %>%
+  summarise(n = n()) %>%
+  mutate(prop = (n / sum(n)) * 100)
+
+#----
+
+# other data access
+unique(data_empirical[data_empirical$other_data == "yes",]$other_data_access)
+
+## distribution?
+other_data_access <- data_empirical %>% 
+  filter(other_data == "yes") %>% 
+  group_by(other_data_access) %>%
+  summarise(n = n()) %>%
+  mutate(prop = (n / sum(n)) * 100)
+
+#----
+
+# other data type
+unique(data_empirical[data_empirical$other_data == "yes",]$other_data_type)
+
+## distribution?
+data_empirical %>% 
+  filter(other_data == "yes") %>% 
+  group_by(other_data_type) %>%
+  summarise(n = n()) %>%
+  mutate(prop = (n / sum(n)) * 100)
+
+```
+
+`r other_data[other_data$other_data == "yes",]$n` of assessed articles were coded as reporting to share resources that could be considered some form of non-primary data (`r round(other_data[other_data$other_data == "yes",]$prop,1)`%), mostly additional meta data or summary statistics.
+This information was reported to be found in supplementary materials hosted by the journal (n = `r round(other_data_location[other_data_location$other_data_location == "Supplementary materials hosted by the journal",]$n)`), available "upon request" from the authors (n = `r round(other_data_location[other_data_location$other_data_location == "Upon request from the authors",]$n,1)`), or
+available from a third party (n = `r round(other_data_location[other_data_location$other_data_location == "Available from a third party",]$n,1)`). 
+Only one article pointed to an open online third-party repository like the OSF or Github and one article remained too vague to recover where to access the information.
+All in all, out of the `r other_data[other_data$other_data == "yes",]$n` only `r other_data_access[other_data_access$other_data_access == "Yes",]$n` could be actually accessed. 
+
+```{r analysis}
+
+unique(data_empirical$analysis)
+
+## distribution?
+analysis <- data_empirical %>% 
+  group_by(analysis) %>%
+  summarise(n = n()) %>%
+  mutate(prop = (n / sum(n)) * 100)
+
+# hack to keep all response even if 0
+dummy_analysis <- data.frame(expand.grid(year = seq(2007,2023), analysis = c("yes", "no")))
+
+# prepare for plot
+analysis_year_agg <- data_empirical %>% 
+  mutate(analysis = ifelse(analysis != "no", "yes", analysis)) %>% 
+  group_by(year, analysis) %>% 
+  summarise(n = n()) %>%
+  mutate(prop = (n / sum(n))) %>% 
+  select(-n) %>% 
+  full_join(dummy_analysis) %>% 
+  mutate(prop = ifelse(is.na(prop), 0, prop))
+
+
+analysis_plot <- 
+  ggplot(analysis_year_agg, 
+         aes(x = year, y = prop, fill = analysis)) +
+    geom_area() + 
+  scale_fill_manual(values = c("lightgrey","#499C76"),
+                    name = NULL,
+                    labels = c("no analysis sharing", "analysis sharing")) +
+  labs(title = "(D) Analysis sharing",
+       x = "\nyear of publication",
+       y = "proportion\n") +
+  scale_y_continuous(breaks = c(0,.20,.40,.60,.80,1),
+                      labels = c("0%", "20%", "40%", "60%", "80%",  "100%")) +
+  scale_x_continuous(breaks =  c(2007, 2015, 2023),
+                     labels = c("2007", "2015", "2023-2024")) +
+  theme_minimal() 
+
+
+#----
+
+# analysis location
+unique(data_empirical[data_empirical$analysis != "no",]$analysis_location)
+
+## distribution?
+analysis_location <- data_empirical %>% 
+  filter(analysis != "no") %>% 
+  group_by(analysis_location) %>%
+  summarise(n = n()) %>%
+  mutate(prop = (n / sum(n)) * 100)
+
+#----
+
+# analysis access
+unique(data_empirical[data_empirical$analysis != "no",]$analysis_access)
+
+# 2x NAs, on further inspection, these ought to be "yes" because hosted by journal
+data_empirical <- data_empirical %>% 
+  mutate(analysis_access = ifelse(is.na(analysis_access), "Yes", analysis_access))
+
+## distribution?
+analysis_access <- data_empirical %>% 
+  filter(analysis != "no") %>% 
+  group_by(analysis_access) %>%
+  summarise(n = n()) %>%
+  mutate(prop = (n / sum(n)) * 100)
+
+```
+
+`r sum(analysis[analysis$analysis != "no",]$n)` of assessed articles were coded as reporting to share some form of analysis protocols either in form of step-by-step instructions or code (`r round(sum(analysis[analysis$analysis != "no",]$prop,1))`%).
+Out of these, `r analysis_location[analysis_location$analysis_location == "An online, third-party repository (e.g. OSF, GitHub, FigShare, etc.)",]$n` articles pointed to an open online third-party repository like the OSF or Github, `r analysis_location[analysis_location$analysis_location == "Supplementary materials hosted by the journal",]$n` articles pointed to supplementary materials hosted by the journal, `r analysis_location[analysis_location$analysis_location == "Personal or institutional website",]$n` articles pointed to personal or institutional websites, and `r analysis_location[analysis_location$analysis_location == "Upon request from the authors",]$n` were described as available "upon request" from the authors. 
+All in all, out of the `r analysis[analysis$analysis != "no",]$n` only `r analysis_access[analysis_access$analysis_access == "Yes",]$n` could actually be accessed. 
+
+
+```{r robustness}
+
+# robustness check
+unique(data_empirical$robust_check)
+
+## distribution?
+robustness <- data_empirical %>% 
+  group_by(robust_check) %>%
+  summarise(n = n()) %>%
+  mutate(prop = (n / sum(n)) * 100)
+
+# hack to keep all response even if 0
+dummy_robustness <- data.frame(expand.grid(year = seq(2007,2023), robust_check = c("no", "power", "sensitivity", "sensitivity & power")))
+
+# prepare for plot
+robustness_year_agg <- data_empirical %>% 
+  # remove later
+  filter(robust_check != "add consensus exactly as states in one of your two columns. Please do not add new categories.") %>% 
+  group_by(year, robust_check) %>% 
+  summarise(n = n()) %>%
+  mutate(prop = (n / sum(n))) %>% 
+  select(-n) %>% 
+  full_join(dummy_robustness) %>% 
+  mutate(prop = ifelse(is.na(prop), 0, prop))
+
+robustness_plot <- 
+  ggplot(robustness_year_agg, 
+         aes(x = year, y = prop, fill = robust_check)) +
+  geom_area() + 
+  scale_fill_manual(values = c("lightgrey","#5FCC9B", "#499C76", "#2F664E"),
+                    name = NULL, 
+                    labels = c("no check", "power", "sensitivity", "power & sensitivity")) +
+  labs(title = "(E) Robustness checks",
+       x = "\nyear of publication",
+       y = "proportion\n") +
+  scale_y_continuous(breaks = c(0,.20,.40,.60,.80,1),
+                      labels = c("0%", "20%", "40%", "60%", "80%",  "100%")) +
+  scale_x_continuous(breaks =  c(2007, 2015, 2023),
+                     labels = c("2007", "2015", "2023-2024")) +
+  theme_minimal() 
+# +
+#   theme(legend.position = "inside",
+#           legend.position.inside = c(0.1, 0.8),
+#           legend.background = element_rect(color = NA, fill = "white"),
+#           legend.justification = c(0.1, 0.2))
+
+
+## aggregate
+data_robust_agg <- data_empirical %>% 
+  filter(robust_check %in% c("sensitivity", "power", "sensitivity & power", "no")) %>% 
+  group_by(year, robust_check) %>%
+  summarise(n = n()) %>%
+  mutate(prop = (n / sum(n)))
+
+data_robust_agg2 <- data_empirical %>% 
+  mutate(robust_check2 = ifelse(robust_check == "no", 0, 1)) %>% 
+  group_by(year, robust_check2) %>%
+  summarise(n = n()) %>%
+  mutate(prop = (n / sum(n)))
+
+
+```
+
+`r robustness[robustness$robust_check == "no",]$n` of assessed articles reported neither a power analysis nor a sensitivity analysis (`r round(robustness[robustness$robust_check == "no",]$prop,1)`%). 
+`r robustness[robustness$robust_check == "power",]$n` of assessed articles reported a power analysis  (`r round(robustness[robustness$robust_check == "power",]$prop,1)`%), `r robustness[robustness$robust_check == "sensitivity",]$n` of assessed articles reported a sensitivity analysis (`r round(robustness[robustness$robust_check == "sensitivity",]$prop,1)`%), and `r robustness[robustness$robust_check == "sensitivity & power",]$n` of assessed articles reported both a power and sensitivity  analysis (`r round(robustness[robustness$robust_check == "sensitivity & power",]$prop,1)`%). 
+
+```{r materials}
+
+# materials
+unique(data_empirical$materials)
+
+## distribution?
+materials <- data_empirical %>% 
+  group_by(materials) %>%
+  summarise(n = n()) %>%
+  mutate(prop = (n / sum(n)) * 100)
+
+# 1x NAs, on further inspection, this ought to be "no" because hosted by journal
+data_empirical <- data_empirical %>% 
+  mutate(materials = ifelse(is.na(materials), "no", materials))
+
+# hack to keep all response even if 0
+dummy_materials <- data.frame(expand.grid(year = seq(2007,2023), materials = c("yes", "no")))
+
+# prepare for plot
+materials_year_agg <- data_empirical %>% 
+  mutate(materials = ifelse(materials != "no", "yes", materials)) %>% 
+  group_by(year, materials) %>% 
+  summarise(n = n()) %>%
+  mutate(prop = (n / sum(n))) %>% 
+  select(-n) %>% 
+  full_join(dummy_materials) %>% 
+  mutate(prop = ifelse(is.na(prop), 0, prop))
+
+materials_plot <- 
+  ggplot(materials_year_agg, 
+         aes(x = year, y = prop, fill = materials)) +
+    geom_area() + 
+  scale_fill_manual(values = c("lightgrey","#499C76"),
+                    name = NULL,
+                    labels = c("no materials", "materials")) +
+  labs(title = "(C) Materials sharing",
+       x = "\nyear of publication",
+       y = "proportion\n") +
+  scale_y_continuous(breaks = c(0,.20,.40,.60,.80,1),
+                      labels = c("0%", "20%", "40%", "60%", "80%",  "100%")) +
+  scale_x_continuous(breaks =  c(2007, 2015, 2023),
+                     labels = c("2007", "2015", "2023-2024")) +
+  theme_minimal() 
+
+
+#----
+
+# materials location
+unique(data_empirical[data_empirical$materials != "no",]$materials_location)
+
+## distribution?
+materials_location <- data_empirical %>% 
+  filter(materials != "no") %>% 
+  group_by(materials_location) %>%
+  summarise(n = n()) %>%
+  mutate(prop = (n / sum(n)) * 100)
+
+#----
+
+# materials access
+unique(data_empirical[data_empirical$materials != "no",]$materials_access)
+
+## distribution?
+materials_access <- data_empirical %>% 
+  filter(materials != "no") %>% 
+  group_by(materials_access) %>%
+  summarise(n = n()) %>%
+  mutate(prop = (n / sum(n)) * 100)
+
+
+```
+
+`r sum(materials[materials$materials != "no",]$n)` of assessed articles were coded as reporting to share some form of additional materials (`r round(sum(materials[analysis$analysis != "no",]$prop),1)`%).
+Out of these, `r materials_location[materials_location$materials_location == "An online, third-party repository (e.g. OSF, GitHub, FigShare, etc.)",]$n` articles pointed to an open online third-party repository like the OSF or Github, `r materials_location[materials_location$materials_location == "Supplementary materials hosted by the journal",]$n` articles pointed to supplementary materials hosted by the journal, `r materials_location[materials_location$materials_location == "Available from a third party",]$n` articles pointed to third party, and `r materials_location[materials_location$materials_location == "Upon request from the authors",]$n` were described as available "upon request" from the authors. 
+All in all, out of the `r sum(materials[materials$materials != "no",]$n)` only `r materials_access[materials_access$materials_access == "Yes",]$n` could actually be accessed.
+
+```{r replications}
+
+# replication
+unique(data_empirical$replication)
+
+## distribution?
+replication <- data_empirical %>% 
+  group_by(replication) %>%
+  summarise(n = n()) %>%
+  mutate(prop = (n / sum(n)) * 100)
+
+# hack to keep all response even if 0
+dummy_replication <- data.frame(expand.grid(year = seq(2007,2023), replication = c("yes", "no")))
+
+# prepare for plot
+replication_year_agg <- data_empirical %>% 
+  mutate(replication = ifelse(replication != "no", "yes", replication)) %>% 
+  group_by(year, replication) %>% 
+  summarise(n = n()) %>%
+  mutate(prop = (n / sum(n))) %>% 
+  select(-n) %>% 
+  full_join(dummy_replication) %>% 
+  mutate(prop = ifelse(is.na(prop), 0, prop))
+
+replication_plot <- 
+  ggplot(replication_year_agg, 
+         aes(x = year, y = prop, fill = replication)) +
+    geom_area() + 
+  scale_fill_manual(values = c("lightgrey","#499C76"),
+                    name =  NULL, 
+                    label = c("no replication", "replication")) +
+  labs(title = "(F) Replications",
+       x = "\nyear of publication",
+       y = "proportion\n") +
+  scale_y_continuous(breaks = c(0,.20,.40,.60,.80,1),
+                      labels = c("0%", "20%", "40%", "60%", "80%",  "100%")) +
+  scale_x_continuous(breaks =  c(2007, 2015, 2023),
+                     labels = c("2007", "2015", "2023-2024")) +
+  theme_minimal() 
+
+```
+
+`r sum(replication[replication$replication != "no",]$n)` of assessed articles were coded as reporting to replicate a previous study (`r round(sum(replication[replication$replication != "no",]$prop),1)`%). On further inspection... CHECK THEM INDIVIDUALLY
+
+
+```{r coi}
+
+# coi
+unique(data_empirical$coi)
+
+## distribution?
+coi <- data_empirical %>% 
+  group_by(coi) %>%
+  summarise(n = n()) %>%
+  mutate(prop = (n / sum(n)) * 100)
+
+# hack to keep all response even if 0
+dummy_coi <- data.frame(expand.grid(year = seq(2007,2023), coi = c("no statement", "statement says no", "statement says yes")))
+
+# prepare for plot
+coi_year_agg <- data_empirical %>% 
+  # remove later
+  filter(coi != "add consensus exactly as states in one of your two columns. Please do not add new categories.") %>% 
+  group_by(year, coi) %>% 
+  summarise(n = n()) %>%
+  mutate(prop = (n / sum(n))) %>% 
+  select(-n) %>% 
+  full_join(dummy_coi) %>% 
+  mutate(prop = ifelse(is.na(prop), 0, prop))
+
+coi_plot <- 
+  ggplot(coi_year_agg, 
+         aes(x = year, y = prop, fill = coi)) +
+    geom_area() + 
+  scale_fill_manual(values = c("lightgrey","#5FCC9B", "#2F664E"),
+                    name = NULL, 
+                    labels = c("no COI disclosure", "no conflict declared", "conflict declared")) +
+  labs(title = "(G) Conflict of Interest",
+       x = "\nyear of publication",
+       y = "proportion\n") +
+  scale_y_continuous(breaks = c(0,.20,.40,.60,.80,1),
+                      labels = c("0%", "20%", "40%", "60%", "80%",  "100%")) +
+  scale_x_continuous(breaks =  c(2007, 2015, 2023),
+                     labels = c("2007", "2015", "2023-2024")) +
+  theme_minimal() 
+
+
+```
+
+`r sum(coi[coi$coi == "no statement",]$n)` of assessed articles were coded as not reporting whether or not a conflict of interest applied to their study (`r round(sum(coi[coi$coi == "no statement",]$prop),1)`%); 
+`r sum(coi[coi$coi == "statement says no",]$n)` of assessed articles were coded as reporting that there was no conflict of interest applied to their study (`r round(sum(coi[coi$coi == "statement says no",]$prop),1)`%); and
+`r sum(coi[coi$coi == "statement says yes",]$n)` of assessed articles were coded as reporting whether that there in fact was a conflict of interest applied to their study (`r round(sum(coi[coi$coi == "statement says yes",]$prop),1)`%)
+
+```{r oa}
+
+# oa
+unique(data_empirical$isOA)
+
+## distribution?
+oa <- data_empirical %>% 
+  group_by(isOA) %>%
+  summarise(n = n()) %>%
+  mutate(prop = (n / sum(n)) * 100)
+
+# hack to keep all response even if 0
+dummy_oa <- data.frame(expand.grid(year = seq(2007,2023), isOA = c("Yes", "No")))
+
+# prepare for plot
+oa_year_agg <- data_empirical %>% 
+  group_by(year, isOA) %>% 
+  summarise(n = n()) %>%
+  mutate(prop = (n / sum(n))) %>% 
+  select(-n) %>% 
+  full_join(dummy_oa) %>% 
+  mutate(prop = ifelse(is.na(prop), 0, prop))
+
+oa_plot <- 
+  ggplot(oa_year_agg, 
+         aes(x = year, y = prop, fill = isOA)) +
+    geom_area() + 
+  scale_fill_manual(values = c("lightgrey","#499C76"),
+                    name = NULL,
+                    labels = c("no open access", "open access")) +
+  labs(title = "(H) Open access", 
+       x = "\nyear of publication",
+       y = "proportion\n") +
+  scale_y_continuous(breaks = c(0,.20,.40,.60,.80,1),
+                      labels = c("0%", "20%", "40%", "60%", "80%",  "100%")) +
+  scale_x_continuous(breaks =  c(2007, 2015, 2023),
+                     labels = c("2007", "2015", "2023-2024")) +
+   theme_minimal() 
+
+
+```
+
+`r oa[oa$isOA == "Yes",]$n` of assessed articles were coded as being open access according to our definition (`r round(oa[oa$isOA == "Yes",]$prop,1)`%); 
+
+## Overall plot over time
+
+```{r overall_plot}
+
+
+
+overall_plot <- prereg_plot + other_data_plot + materials_plot + analysis_plot +
+  robustness_plot + replication_plot + coi_plot + oa_plot +  plot_layout(axes = "collect", 
+                                                                         axis_titles = "collect", 
+                                                                         ncol = 2) 
+
+# pdf
+ggsave(filename = "../plots/Figure1.pdf",
+       plot = overall_plot,
+       device = "pdf",
+       width = 187, 
+       height = 200,
+       units = "mm",
+       dpi = 300)
+
+# png
+ggsave(filename = "../plots/Figure1.png",
+       plot = overall_plot,
+       device = "png",
+       width = 187, 
+       height = 200,
+       units = "mm",
+       dpi = 300)
+
+```
