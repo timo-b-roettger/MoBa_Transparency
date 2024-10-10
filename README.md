@@ -1,9 +1,25 @@
 # MoBa Transparency Project
 The associated repository for the MoBa Transparency project
 
-### How to use the task management board:
+## parseHTML-MoBaPublicaitons
+Contains script and data for scraping the Moba Publication list.
 
-The project is managed in its own task management board. To manage projects in the task management boards, click on Projects and chose "MoBa transparency assessment". You will see three columns, organized according to [Kanban principles](https://kanbanize.com/kanban-resources): "todo", "in progress" and "done". Here we keep track of tasks, questions, discussion points, etc. alongside their status. You can create a card by "add item" on the bottom of the column. You can quickly draft an item title there which adds the element to the respective column as a draft. Eventually, these items should be stored as so-called "GitHub issues", so you want to click on the item and then click on "Convert to issue" on the right hand side. When converted to an "issue", you can assign members and add a label to it. Assigning a member helps us keep track of who does what. Labels are an easy way to categorize issues according to what action is needed. For now I have defined three labels, but that might change as we evolve together. 
-- help wanted: looking for someone to take over the task or help with completing it
-- input: need input asynchronously
-- meeting: to be discussed at next meeting
+## analysis
+### data
+- `pilot_data.csv`: contains the data for pilot assessment (n=60)
+- `test_data.csv`: contains the data for pilot assessment (n=945)
+- `test_coding_assignment.csv`: contains the data including coder assignments
+- `gsheet_rawdata.csv`: contains the downloaded google sheet data containing the first round of coding of the test data.
+- `OA_assessment.csv`: contains the assessment of open access (OA) by a separate coder.
+- `duplicates.csv`: contains duplicates in the data and was send to coders to manually correct.
+- `duplicates_checked.csv`: corrected duplicate list to remerge with the data.
+- `data_consensus.csv`: table that contained entries where coder 1 and 2 mismatched; exported for consensus coding.
+- `derived_data_table.csv`: final data table after correction of duplicates and after consensus coding; input to `02_descriptive_stats.Rmd`
+
+### scripts
+- `pilot_data_draw.R`: reads `prasedHTML_MoBaPublications.csv`, removes duplicates from list and draws a random sample of 60 articles for a pilot coding; stores pilot sample into `pilot_data.csv`; stores rest in `test_data.csv`.
+- `test_data_draw.R` assigns `test_data.csv` to 6 different coders; randomly samples 20% of articles for each coder and assigns it to a second coder for cross-validation; stores information in `test_coding_assignment.csv`.
+- `01_wrangle_gsheet.Rmd`: Shapes data; resolves inconsistent coding; bins categories; identified duplicates;
+- `02_descriptive_stats.Rmd`: Summarises data and creates figure.
+
+

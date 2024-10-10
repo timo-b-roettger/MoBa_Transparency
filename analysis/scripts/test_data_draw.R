@@ -1,5 +1,6 @@
-# Assign test data to coders
-# Timo Roettger (timo.b.roettger@gmail.com), 25 October 2023
+# description: Create random selection of pilot articles
+# author: Timo Roettger
+# date: 2023-10-25
 
 # force relevant packages
 if (!require("pacman")) install.packages("pacman")
@@ -10,7 +11,7 @@ current_working_dir <- dirname(rstudioapi::getActiveDocumentContext()$path)
 setwd(current_working_dir)
 
 # read list of test articles
-test <- read_csv("test_data.csv")
+test <- read_csv("../data/test_data.csv")
 # n = 945
 
 # randomize order
@@ -31,5 +32,5 @@ shuffled_data[1:subset_n,]$Coder2 <- c(rep(c("Agata", "Max", "Timo","Julien", "T
 # double check
 xtabs(~Coder + Coder2, shuffled_data)
 
-write.csv(shuffled_data, "test_coding_assignment.csv")
+#write.csv(shuffled_data, "../data/test_coding_assignment.csv")
 

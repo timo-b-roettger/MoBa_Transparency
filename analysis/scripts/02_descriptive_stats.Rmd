@@ -1,19 +1,23 @@
 ---
-title: "02_descriptive_stats"
+title: "Descriptive Overview of Transparent Practices in MoBa"
 author: "Timo Roettger"
 date: "2024-08-21"
 output: word_document
+editor_options: 
+  markdown: 
+    wrap: sentence
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, 
+                      message = FALSE,
                       warning = FALSE, 
                       error = FALSE)
 ```
 
-## General characteristics
+# General sample characteristics
 
-```{r loadData}
+```{r loadData, include = FALSE}
 
 # nifty code using the pacman package
 # it checks if the packages specified below are installed, if not, they will be installed, if yes, they will be loaded
@@ -22,20 +26,19 @@ pacman::p_load(rstudioapi, tidyverse, janitor, patchwork, ggstream)
 
 # set the current working directory to the one where this file is
 current_working_dir <- dirname(rstudioapi::getActiveDocumentContext()$path)
-# set when runnning script outside of knitting
-# setwd(current_working_dir)
+# set when running script outside of knitting
+setwd(current_working_dir)
 
 # let's load our dataset
 data <- read_csv("../data/derived_data_table.csv")
 
 ```
 
-
 ```{r major_issues}
 
 # major_issue
 ## check unique
-unique(data$major_issue)
+# unique(data$major_issue)
 
 # 3x NAs, on further inspection, these ought to be "other"
 data <- data %>% 
@@ -55,34 +58,32 @@ data_no_issues <- data %>%
   
 ```
 
-`r major_issues[major_issues$major_issue == "no issues",]$n` of articles were coded as in principle assessible (
-`r round(major_issues[major_issues$major_issue == "no issues",]$prop,1)`%)
-). Only those articles were further analysed. 
-`r major_issues[major_issues$major_issue == "no access",]$n` of articles could not be accessed by the coder (`r round(major_issues[major_issues$major_issue == "no access",]$prop,1)`%); 
-`r major_issues[major_issues$major_issue == "not a full article",]$n` of articles were coded as not being a full article, i.e. conference abstract or an erratum (
-`r round(major_issues[major_issues$major_issue == "not a full article",]$prop,1)`%); 
-`r major_issues[major_issues$major_issue == "not in English",]$n` of articles were coded as not being written in English (
-`r round(major_issues[major_issues$major_issue == "not in English",]$prop,1)`%); and
-`r major_issues[major_issues$major_issue == "other",]$n` of articles were coded as having other issues (
-`r round(major_issues[major_issues$major_issue == "other",]$prop,1)`%) were coded as other issues, including papers that did not use MoBa.
+`r major_issues[major_issues$major_issue == "no issues",]$n` articles were coded as in principle accessible (`r round(major_issues[major_issues$major_issue == "no issues",]$prop,1)`%).
+Only those articles were further analysed.
+`r major_issues[major_issues$major_issue == "no access",]$n` articles could not be accessed by the coder (`r round(major_issues[major_issues$major_issue == "no access",]$prop,1)`%); `r major_issues[major_issues$major_issue == "not a full article",]$n` articles were coded as not being a full article, i.e. conference abstract or an erratum (`r round(major_issues[major_issues$major_issue == "not a full article",]$prop,1)`%); `r major_issues[major_issues$major_issue == "not in English",]$n` articles were coded as not being written in English (`r round(major_issues[major_issues$major_issue == "not in English",]$prop,1)`%); and `r major_issues[major_issues$major_issue == "other",]$n` articles were coded as having other issues (`r round(major_issues[major_issues$major_issue == "other",]$prop,1)`%) .
 
 ```{r publication_year}
 
 # year
-unique(data_no_issues$year)
+#unique(data_no_issues$year)
 
 # only two instances of 2024, since we plot proportions it is useful to collapse 2023 and 2024 into each other
 
 data_no_issues <- data_no_issues %>% 
   mutate(year = ifelse(year == 2024, 2023, year))
 
+```
+
+
+```{r plot_year, echo = FALSE}
+
 ## plot 
 year_plot <- 
 ggplot(data_no_issues) +
   geom_histogram(aes(x = year),
                  binwidth = 1,
-                 fill = "lightgrey",
-                 color = "#9AA6E5") +
+                 fill = "#9AA6E5",
+                 color = "black") +
   labs(y = " ",
        x = "\npublication year") + 
   scale_x_continuous(breaks =  c(2007, 2015, 2023),
@@ -90,13 +91,14 @@ ggplot(data_no_issues) +
   theme_minimal() +
   theme(legend.position = "none")
 
-```
+year_plot
 
+```
 
 ```{r study_type}
 
 # study_type
-unique(data_no_issues$study_type)
+#unique(data_no_issues$study_type)
 
 # cross_tab
 study_type <- 
@@ -114,17 +116,15 @@ data_empirical <- data_no_issues %>%
 
 ```
 
-Of those articles that were in principle assessible, `r study_type[study_type$study_type == "Secondary analysis of MoBa data",]$n` of articles were coded as secondary analysis of MoBa data (`r round(study_type[study_type$study_type == "Secondary analysis of MoBa data",]$prop,1)`%) and `r study_type[study_type$study_type == "Data synthesis - Meta-analysis.",]$n` of articles were coded as being part of a meta analysis (including other epidiomological data sets, `r round(study_type[study_type$study_type == "Data synthesis - Meta-analysis.",]$prop,1)`%). 
-Only those two categories were further evaluated. 
-`r study_type[study_type$study_type == "no empirical data",]$n` of articles were coded as not presenting data (i.e. editorials or reviews, `r round(study_type[study_type$study_type == "no empirical data",]$prop,1)`%) and 
-`r study_type[study_type$study_type == "Unclear",]$n` of articles could not be categorized ("unclear) but were considered not further assessible (i.e. editorials or reviews, `r round(study_type[study_type$study_type == "Unclear",]$prop,1)`%). 
+Of those articles that were in principle accessible, `r study_type[study_type$study_type == "Secondary analysis of MoBa data",]$n` articles were coded as secondary analysis of MoBa data (`r round(study_type[study_type$study_type == "Secondary analysis of MoBa data",]$prop,1)`%) and `r study_type[study_type$study_type == "Data synthesis - Meta-analysis.",]$n` were coded as being part of a meta analysis (including other epidemiological corpora, `r round(study_type[study_type$study_type == "Data synthesis - Meta-analysis.",]$prop,1)`%).
+Only those two categories were further evaluated.
+`r study_type[study_type$study_type == "no empirical data",]$n` articles were coded as not presenting empirical data (i.e. editorials or reviews, `r round(study_type[study_type$study_type == "no empirical data",]$prop,1)`%) and `r study_type[study_type$study_type == "Unclear",]$n` could not be categorized ("unclear) but were considered not further accessible (`r round(study_type[study_type$study_type == "Unclear",]$prop,1)`%).
 This left us with `r study_type[study_type$study_type == "Secondary analysis of MoBa data",]$n + study_type[study_type$study_type == "Data synthesis - Meta-analysis.",]$n` articles that were further analysed.
-
 
 ```{r pregistration}
 
 # preregistered
-unique(data_empirical$preregistered)
+#unique(data_empirical$preregistered)
 
 # cross_tab
 prereg <- data_empirical %>% group_by(preregistered) %>%
@@ -161,7 +161,7 @@ prereg_plot <-
 #----
 
 # prereg_location
-unique(data_empirical[data_empirical$preregistered == "Yes",]$prereg_location)
+#unique(data_empirical[data_empirical$preregistered == "Yes",]$prereg_location)
 
 prereg_location <- data_empirical %>% 
   filter(preregistered == "Yes") %>% 
@@ -172,7 +172,7 @@ prereg_location <- data_empirical %>%
 #----
 
 # prereg_access
-unique(data_empirical[data_empirical$preregistered == "Yes",]$prereg_access)
+#unique(data_empirical[data_empirical$preregistered == "Yes",]$prereg_access)
 
 prereg_access <- data_empirical %>% 
   filter(preregistered == "Yes") %>% 
@@ -185,29 +185,34 @@ prereg_access <- data_empirical %>%
 #----
 
 # prereg_aspects
-unique(data_empirical[data_empirical$preregistered == "Yes",]$prereg_aspects)
+#unique(data_empirical[data_empirical$preregistered == "Yes",]$prereg_aspects)
 
 #----
 
 ```
 
-In the entire corpus, there were `r prereg[prereg$preregistered == "Yes",]$n` studies that reported to have preregistered aspects of their analysis. 
-With the available information we were able to recover the original preregistration (albeit it required some digging). Upon further scrutiny, all three preregistrations preregistered some aspects of the analysis including research question, variables and data analysis, but LOOK DEEPER INTO THOSE THREE
+# Individual transparent practices
+
+## Preregistrations
+In the entire corpus, there were `r prereg[prereg$preregistered == "Yes",]$n` studies that reported to have preregistered aspects of their analysis.
+With the available information we were able to recover the original preregistration (albeit it required some digging).
+Upon further scrutiny, all three studies preregistered some aspects of the analysis including research question, variables and data analysis.
 
 ```{r synthesised_data}
 
-unique(data_empirical$synthesised)
+#unique(data_empirical$synthesised)
 
 # Nope nada
 
 ```
 
-None of the studies reported to use synthesized data, which in principle would allow to reproduce their analysis without violating data protection laws. 
+## Synthetetic data
+None of the studies reported to use synthesized data, which in principle would allow to reproduce their analysis without violating data protection laws.
 
 ```{r other_data}
 
 # other data
-unique(data_empirical$other_data)
+#unique(data_empirical$other_data)
 
 # 2x NAs, one further inspection, these ought to be "no"
 data_empirical <- data_empirical %>% 
@@ -249,7 +254,7 @@ other_data_plot <-
 #----
 
 # other data location
-unique(data_empirical[data_empirical$other_data == "yes",]$other_data_location)
+#unique(data_empirical[data_empirical$other_data == "yes",]$other_data_location)
 
 ## distribution?
 other_data_location <- data_empirical %>% 
@@ -261,7 +266,7 @@ other_data_location <- data_empirical %>%
 #----
 
 # other data access
-unique(data_empirical[data_empirical$other_data == "yes",]$other_data_access)
+#unique(data_empirical[data_empirical$other_data == "yes",]$other_data_access)
 
 ## distribution?
 other_data_access <- data_empirical %>% 
@@ -273,10 +278,10 @@ other_data_access <- data_empirical %>%
 #----
 
 # other data type
-unique(data_empirical[data_empirical$other_data == "yes",]$other_data_type)
+#unique(data_empirical[data_empirical$other_data == "yes",]$other_data_type)
 
 ## distribution?
-data_empirical %>% 
+other_data_type <- data_empirical %>% 
   filter(other_data == "yes") %>% 
   group_by(other_data_type) %>%
   summarise(n = n()) %>%
@@ -284,17 +289,17 @@ data_empirical %>%
 
 ```
 
-`r other_data[other_data$other_data == "yes",]$n` of assessed articles were coded as reporting to share resources that could be considered some form of non-primary data (`r round(other_data[other_data$other_data == "yes",]$prop,1)`%), mostly additional meta data or summary statistics.
-This information was reported to be found in supplementary materials hosted by the journal (n = `r round(other_data_location[other_data_location$other_data_location == "Supplementary materials hosted by the journal",]$n)`), available "upon request" from the authors (n = `r round(other_data_location[other_data_location$other_data_location == "Upon request from the authors",]$n,1)`), or
-available from a third party (n = `r round(other_data_location[other_data_location$other_data_location == "Available from a third party",]$n,1)`). 
+## Other data sharing
+`r other_data[other_data$other_data == "yes",]$n` of assessed articles were coded as reporting to share resources that could be considered some form of non-primary data (`r round(other_data[other_data$other_data == "yes",]$prop,1)`%), mostly additional metadata or summary statistics.
+This information was reported to be found in supplementary materials hosted by the journal (n = `r round(other_data_location[other_data_location$other_data_location == "Supplementary materials hosted by the journal",]$n)`), available "upon request" from the authors (n = `r round(other_data_location[other_data_location$other_data_location == "Upon request from the authors",]$n,1)`), or available from a third party (n = `r round(other_data_location[other_data_location$other_data_location == "Available from a third party",]$n,1)`).
 Only one article pointed to an open online third-party repository like the OSF or Github and one article remained too vague to recover where to access the information.
-All in all, out of the `r other_data[other_data$other_data == "yes",]$n` only `r other_data_access[other_data_access$other_data_access == "Yes",]$n` could be actually accessed. 
+All in all, out of the `r other_data[other_data$other_data == "yes",]$n` articles claiming to share some form of non-primary data, `r other_data_access[other_data_access$other_data_access == "Yes",]$n` could be accessed by us.
 
 ```{r analysis}
 
-unique(data_empirical$analysis)
+#unique(data_empirical$analysis)
 
-## distribution?
+# distribution?
 analysis <- data_empirical %>% 
   group_by(analysis) %>%
   summarise(n = n()) %>%
@@ -334,7 +339,7 @@ analysis_plot <-
 #----
 
 # analysis location
-unique(data_empirical[data_empirical$analysis != "no",]$analysis_location)
+#unique(data_empirical[data_empirical$analysis != "no",]$analysis_location)
 
 ## distribution?
 analysis_location <- data_empirical %>% 
@@ -346,7 +351,7 @@ analysis_location <- data_empirical %>%
 #----
 
 # analysis access
-unique(data_empirical[data_empirical$analysis != "no",]$analysis_access)
+#unique(data_empirical[data_empirical$analysis != "no",]$analysis_access)
 
 # 2x NAs, on further inspection, these ought to be "yes" because hosted by journal
 data_empirical <- data_empirical %>% 
@@ -361,15 +366,15 @@ analysis_access <- data_empirical %>%
 
 ```
 
+## Analysis sharing
 `r sum(analysis[analysis$analysis != "no",]$n)` of assessed articles were coded as reporting to share some form of analysis protocols either in form of step-by-step instructions or code (`r round(sum(analysis[analysis$analysis != "no",]$prop,1))`%).
-Out of these, `r analysis_location[analysis_location$analysis_location == "An online, third-party repository (e.g. OSF, GitHub, FigShare, etc.)",]$n` articles pointed to an open online third-party repository like the OSF or Github, `r analysis_location[analysis_location$analysis_location == "Supplementary materials hosted by the journal",]$n` articles pointed to supplementary materials hosted by the journal, `r analysis_location[analysis_location$analysis_location == "Personal or institutional website",]$n` articles pointed to personal or institutional websites, and `r analysis_location[analysis_location$analysis_location == "Upon request from the authors",]$n` were described as available "upon request" from the authors. 
-All in all, out of the `r analysis[analysis$analysis != "no",]$n` only `r analysis_access[analysis_access$analysis_access == "Yes",]$n` could actually be accessed. 
-
+Out of these, `r analysis_location[analysis_location$analysis_location == "An online, third-party repository (e.g. OSF, GitHub, FigShare, etc.)",]$n` articles pointed to an open online third-party repository like the OSF or Github, `r analysis_location[analysis_location$analysis_location == "Supplementary materials hosted by the journal",]$n` articles pointed to supplementary materials hosted by the journal, `r analysis_location[analysis_location$analysis_location == "Personal or institutional website",]$n` article pointed to personal or institutional websites, and `r analysis_location[analysis_location$analysis_location == "Upon request from the authors",]$n` were described as available "upon request" from the authors.
+All in all, out of the `r sum(analysis[analysis$analysis != "no",]$n)` only `r analysis_access[analysis_access$analysis_access == "Yes",]$n` could be accessed.
 
 ```{r robustness}
 
 # robustness check
-unique(data_empirical$robust_check)
+#unique(data_empirical$robust_check)
 
 ## distribution?
 robustness <- data_empirical %>% 
@@ -429,13 +434,14 @@ data_robust_agg2 <- data_empirical %>%
 
 ```
 
-`r robustness[robustness$robust_check == "no",]$n` of assessed articles reported neither a power analysis nor a sensitivity analysis (`r round(robustness[robustness$robust_check == "no",]$prop,1)`%). 
-`r robustness[robustness$robust_check == "power",]$n` of assessed articles reported a power analysis  (`r round(robustness[robustness$robust_check == "power",]$prop,1)`%), `r robustness[robustness$robust_check == "sensitivity",]$n` of assessed articles reported a sensitivity analysis (`r round(robustness[robustness$robust_check == "sensitivity",]$prop,1)`%), and `r robustness[robustness$robust_check == "sensitivity & power",]$n` of assessed articles reported both a power and sensitivity  analysis (`r round(robustness[robustness$robust_check == "sensitivity & power",]$prop,1)`%). 
+## Robustness checks
+`r robustness[robustness$robust_check == "no",]$n` of assessed articles reported neither a power analysis nor a sensitivity analysis (`r round(robustness[robustness$robust_check == "no",]$prop,1)`%).
+`r robustness[robustness$robust_check == "power",]$n` of assessed articles reported a power analysis (`r round(robustness[robustness$robust_check == "power",]$prop,1)`%), `r robustness[robustness$robust_check == "sensitivity",]$n` of assessed articles reported a sensitivity analysis (`r round(robustness[robustness$robust_check == "sensitivity",]$prop,1)`%), and `r robustness[robustness$robust_check == "sensitivity & power",]$n` of assessed articles reported both a power and sensitivity analysis (`r round(robustness[robustness$robust_check == "sensitivity & power",]$prop,1)`%).
 
 ```{r materials}
 
 # materials
-unique(data_empirical$materials)
+#unique(data_empirical$materials)
 
 ## distribution?
 materials <- data_empirical %>% 
@@ -480,7 +486,7 @@ materials_plot <-
 #----
 
 # materials location
-unique(data_empirical[data_empirical$materials != "no",]$materials_location)
+#unique(data_empirical[data_empirical$materials != "no",]$materials_location)
 
 ## distribution?
 materials_location <- data_empirical %>% 
@@ -492,7 +498,7 @@ materials_location <- data_empirical %>%
 #----
 
 # materials access
-unique(data_empirical[data_empirical$materials != "no",]$materials_access)
+#unique(data_empirical[data_empirical$materials != "no",]$materials_access)
 
 ## distribution?
 materials_access <- data_empirical %>% 
@@ -504,14 +510,15 @@ materials_access <- data_empirical %>%
 
 ```
 
-`r sum(materials[materials$materials != "no",]$n)` of assessed articles were coded as reporting to share some form of additional materials (`r round(sum(materials[analysis$analysis != "no",]$prop),1)`%).
-Out of these, `r materials_location[materials_location$materials_location == "An online, third-party repository (e.g. OSF, GitHub, FigShare, etc.)",]$n` articles pointed to an open online third-party repository like the OSF or Github, `r materials_location[materials_location$materials_location == "Supplementary materials hosted by the journal",]$n` articles pointed to supplementary materials hosted by the journal, `r materials_location[materials_location$materials_location == "Available from a third party",]$n` articles pointed to third party, and `r materials_location[materials_location$materials_location == "Upon request from the authors",]$n` were described as available "upon request" from the authors. 
-All in all, out of the `r sum(materials[materials$materials != "no",]$n)` only `r materials_access[materials_access$materials_access == "Yes",]$n` could actually be accessed.
+## Materials sharing
+`r sum(materials[materials$materials != "no",]$n, na.rm = TRUE)` of assessed articles were coded as reporting to share some form of additional materials (`r round(sum(materials[analysis$analysis != "no",]$prop),1)`%).
+Out of these, `r materials_location[materials_location$materials_location == "An online, third-party repository (e.g. OSF, GitHub, FigShare, etc.)",]$n` articles pointed to an open online third-party repository like the OSF or Github, `r materials_location[materials_location$materials_location == "Supplementary materials hosted by the journal",]$n` articles pointed to supplementary materials hosted by the journal, `r materials_location[materials_location$materials_location == "Available from a third party",]$n` articles pointed to third party, and `r materials_location[materials_location$materials_location == "Upon request from the authors",]$n` were described as available "upon request" from the authors.
+All in all, out of the `r sum(materials[materials$materials != "no",]$n, na.rm = TRUE)` only `r materials_access[materials_access$materials_access == "Yes",]$n` could actually be accessed.
 
 ```{r replications}
 
 # replication
-unique(data_empirical$replication)
+#unique(data_empirical$replication)
 
 ## distribution?
 replication <- data_empirical %>% 
@@ -550,13 +557,13 @@ replication_plot <-
 
 ```
 
-`r sum(replication[replication$replication != "no",]$n)` of assessed articles were coded as reporting to replicate a previous study (`r round(sum(replication[replication$replication != "no",]$prop),1)`%). On further inspection... CHECK THEM INDIVIDUALLY
-
+## Replications
+`r sum(replication[replication$replication != "no",]$n)` of assessed articles were coded as reporting to replicate a previous study (`r round(sum(replication[replication$replication != "no",]$prop),1)`%).
 
 ```{r coi}
 
 # coi
-unique(data_empirical$coi)
+#unique(data_empirical$coi)
 
 ## distribution?
 coi <- data_empirical %>% 
@@ -597,14 +604,13 @@ coi_plot <-
 
 ```
 
-`r sum(coi[coi$coi == "no statement",]$n)` of assessed articles were coded as not reporting whether or not a conflict of interest applied to their study (`r round(sum(coi[coi$coi == "no statement",]$prop),1)`%); 
-`r sum(coi[coi$coi == "statement says no",]$n)` of assessed articles were coded as reporting that there was no conflict of interest applied to their study (`r round(sum(coi[coi$coi == "statement says no",]$prop),1)`%); and
-`r sum(coi[coi$coi == "statement says yes",]$n)` of assessed articles were coded as reporting whether that there in fact was a conflict of interest applied to their study (`r round(sum(coi[coi$coi == "statement says yes",]$prop),1)`%)
+## Conflicts of Interests (COIs)
+`r sum(coi[coi$coi == "no statement",]$n)` of assessed articles were coded as not reporting whether or not a conflict of interest applied to their study (`r round(sum(coi[coi$coi == "no statement",]$prop),1)`%); `r sum(coi[coi$coi == "statement says no",]$n)` of assessed articles were coded as reporting that there was no conflict of interest applied to their study (`r round(sum(coi[coi$coi == "statement says no",]$prop),1)`%); and `r sum(coi[coi$coi == "statement says yes",]$n)` of assessed articles were coded as reporting whether that there in fact was a conflict of interest applied to their study (`r round(sum(coi[coi$coi == "statement says yes",]$prop),1)`%)
 
 ```{r oa}
 
 # oa
-unique(data_empirical$isOA)
+#unique(data_empirical$isOA)
 
 ## distribution?
 oa <- data_empirical %>% 
@@ -630,8 +636,8 @@ oa_plot <-
     geom_area() + 
   scale_fill_manual(values = c("lightgrey","#499C76"),
                     name = NULL,
-                    labels = c("no open access", "open access")) +
-  labs(title = "(H) Open access", 
+                    labels = c("publicly available", "not available")) +
+  labs(title = "(H) Open publishing", 
        x = "\nyear of publication",
        y = "proportion\n") +
   scale_y_continuous(breaks = c(0,.20,.40,.60,.80,1),
@@ -643,18 +649,18 @@ oa_plot <-
 
 ```
 
-`r oa[oa$isOA == "Yes",]$n` of assessed articles were coded as being open access according to our definition (`r round(oa[oa$isOA == "Yes",]$prop,1)`%); 
+## Open publishing
+`r oa[oa$isOA == "Yes",]$n` of assessed articles were coded as being openly published according to our definition (`r round(oa[oa$isOA == "Yes",]$prop,1)`%);
 
-## Overall plot over time
+# Trends over time
 
 ```{r overall_plot}
-
-
 
 overall_plot <- prereg_plot + other_data_plot + materials_plot + analysis_plot +
   robustness_plot + replication_plot + coi_plot + oa_plot +  plot_layout(axes = "collect", 
                                                                          axis_titles = "collect", 
                                                                          ncol = 2) 
+
 
 # pdf
 ggsave(filename = "../plots/Figure1.pdf",
@@ -675,3 +681,11 @@ ggsave(filename = "../plots/Figure1.png",
        dpi = 300)
 
 ```
+
+
+```{r plot_fig1, fig.cap="Figure 2: Proportion of transparent practices for articles as a function of publication year (2007-2024). Year 2023 and 2024 were collapsed due to a small number of n."}
+
+knitr::include_graphics("../plots/Figure1.png")
+
+```
+

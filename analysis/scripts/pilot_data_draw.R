@@ -1,6 +1,6 @@
-# create random selection of N = 60 pilot articles distributed across M = 6 coders
-# Max Korbmacher (max.korbmacher@gmail.com), 24 October 2023
-# Edited by Timo Roettger (timo.b.roettger@gmail.com), 25 October 2023
+# description: Create random selection of pilot articles
+# author: Max Korbmacher & Timo Roettger
+# date: 2023-10-24
 
 # force relevant packages
 if (!require("pacman")) install.packages("pacman")
@@ -14,24 +14,24 @@ setwd(current_working_dir)
 ##################### PREP DATA
 
 # read data (Moba Publication list dated 1 December 2022)
-data = read.csv("prasedHTML_MoBaPublications.csv", sep = "\t")
-# extract dois
-data$doi = sapply(strsplit(data$TexttoParse, "https://"), "[", 2)
+xdata  <-  read_tsv("../../parseHTML-MoBaPublications/prasedHTML_MoBaPublications.csv", )
+# extract DOIs
+xdata$doi  <-  sapply(strsplit(xdata$TexttoParse, "https://"), "[", 2)
 
 # count entries
-paste("Entries including dublicates:", nrow(data))
+paste("Entries including duplicates:", nrow(xdata))
 
 # exclude duplicates
-data = data[!duplicated(data$ApproximateTitle),]
+xdata = xdata[!duplicated(xdata$ApproximateTitle),]
 
 # count entries after exclusions
-paste("Unique entries:", nrow(data))
+paste("Unique entries:", nrow(xdata))
 
 
 #################### PILOT - TEST DATA SPLIT
 
 # draw a random sample
-pilot = data[sample(nrow(data), size = 60, replace = FALSE), ]
+pilot = xdata[sample(nrow(xdata), size = 60, replace = FALSE), ]
 
 # remove pilot from test data
 test = data[!data$ApproximateTitle %in% pilot$ApproximateTitle,]
@@ -41,5 +41,5 @@ test = data[!data$ApproximateTitle %in% pilot$ApproximateTitle,]
 pilot$Coder <- rep(c("Julien", "Tamara", "Ivana", "Agata", "Max", "Timo"), n = 10)
 
 # save coder sheet and test tables
-write.csv(test, "test_data.csv")
-write.csv(pilot, "pilot_data.csv")
+#write.csv(test, "../data/test_data.csv")
+#write.csv(pilot, "../data/pilot_data.csv")
